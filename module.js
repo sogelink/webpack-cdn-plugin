@@ -41,6 +41,7 @@ class WebpackCdnPlugin {
         if (moduleId !== false) {
           const modules = this.modules[moduleId || Reflect.ownKeys(this.modules)[0]];
           if (modules) {
+            WebpackCdnPlugin._cleanModules(modules);
             data.assets.js = WebpackCdnPlugin._getJs(modules, ...getArgs).concat(data.assets.js);
             data.assets.css = WebpackCdnPlugin._getCss(modules, ...getArgs).concat(data.assets.css);
           }
@@ -64,45 +65,77 @@ class WebpackCdnPlugin {
     return require(path.join(WebpackCdnPlugin.node_modules, name, packageJson)).version;
   }
 
+  static _cleanModules(modules) {
+    modules.forEach(p => {
+      p.version = WebpackCdnPlugin.getVersion(p.name);
+
+      if (!p.paths) {
+        p.paths = [];
+      }
+      if (p.path) {
+        p.paths.push(p.path);
+      }
+      if (p.paths.length === 0) {
+        p.paths.push(require.resolve(p.name).match(/[\\/]node_modules[\\/].+?[\\/](.*)/)[1].replace(/\\/g, '/'));
+      }
+
+      if (!p.styles) {
+        p.styles = [];
+      }
+      if (p.style) {
+        p.styles.push(p.style);
+      }
+    });
+  }
+
   static _getCss(modules, url, prefix, prod, publicPath) {
     prefix = prefix || empty;
     prod = prod !== false;
 
-    return modules
-      .filter(p => p.localStyle)
-      .map(p => publicPath + p.localStyle)
-      .concat(modules.filter(p => p.style).map((p) => {
-        p.version = WebpackCdnPlugin.getVersion(p.name);
+    let files = [];
 
-        return prefix + url.replace(paramsRegex, (m, p1) => {
-          if (prod && p.cdn && p1 === 'name') {
-            return p.cdn;
-          }
+    modules.filter(p => p.localStyle)
+      .forEach(p => files.push(publicPath + p.localStyle));
 
-          return p[p1 === 'path' ? 'style' : p1];
-        });
-      }));
+    modules.filter(p => p.styles.length > 0)
+      .forEach(p => {
+        p.styles.forEach(s => files.push(
+          prefix + url.replace(paramsRegex, (m, p1) => {
+            if (prod && p.cdn && p1 === 'name') {
+              return p.cdn;
+            }
+
+            return p1 === 'path' ? s : p[p1];
+          })
+        ))
+      });
+
+    return files;
   }
 
   static _getJs(modules, url, prefix, prod, publicPath) {
     prefix = prefix || empty;
     prod = prod !== false;
 
-    return modules
-      .filter(p => p.localScript)
-      .map(p => publicPath + p.localScript)
-      .concat(modules.filter(p => !p.cssOnly).map((p) => {
-        p.version = WebpackCdnPlugin.getVersion(p.name);
-        p.path = p.path || require.resolve(p.name).match(/[\\/]node_modules[\\/].+?[\\/](.*)/)[1].replace(/\\/g, '/');
+    let files = [];
 
-        return prefix + url.replace(paramsRegex, (m, p1) => {
-          if (prod && p.cdn && p1 === 'name') {
-            return p.cdn;
-          }
+    modules.filter(p => p.localScript)
+      .forEach(p => files.push(publicPath + p.localScript));
 
-          return p[p1];
-        });
-      }));
+    modules.filter(p => !p.cssOnly)
+      .forEach(p => {
+        p.paths.forEach(s => files.push(
+          prefix + url.replace(paramsRegex, (m, p1) => {
+            if (prod && p.cdn && p1 === 'name') {
+              return p.cdn;
+            }
+
+            return p1 === 'path' ? s : p[p1];
+          })
+        ));
+      });
+
+    return files;
   }
 }
 
