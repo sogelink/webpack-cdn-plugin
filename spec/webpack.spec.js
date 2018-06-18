@@ -61,6 +61,7 @@ function getConfig({
   publicPath2 = '/assets',
   prodUrl,
   multiple,
+  multipleFiles,
 }) {
   const output = {
     path: path.join(__dirname, 'dist/assets'),
@@ -83,16 +84,7 @@ function getConfig({
   ];
   if (multiple) {
     modules = {
-      module1: [
-        { name: 'jasmine-spec-reporter', path: 'index.js' },
-        {
-          name: 'nyc',
-          style: 'style.css',
-          localStyle: 'local.css',
-          localScript: 'local.js',
-        },
-        { name: 'jasmine', cdn: 'jasmine2', style: 'style.css' },
-      ],
+      module1: modules,
       module2: [
         { name: 'jasmine-core', path: 'index.js' },
         {
@@ -104,6 +96,33 @@ function getConfig({
         { name: 'archy', cdn: 'archy', style: 'style.css' },
       ],
     };
+  }
+  if (multipleFiles) {
+    modules = [
+      {
+        name: 'jasmine',
+        cdn: 'jasmine2',
+        paths: [
+          'index1.js',
+          'index2.js'
+        ],
+        styles: [
+          'style1.css',
+          'style2.css'
+        ]
+      },
+      {
+        name: 'archy',
+        path: 'index1.js',
+        paths: [
+          'index2.js'
+        ],
+        style: 'style1.css',
+        styles: [
+          'style2.css'
+        ]
+      }
+    ];
   }
 
   const options = {
@@ -225,6 +244,31 @@ describe('Webpack Integration', () => {
         ]);
       });
     });
+
+    describe('With multiple files', () => {
+      beforeAll((done) => {
+        runWebpack(done, getConfig({ prod: true, publicPath: null, publicPath2: null, multipleFiles: true }));
+      });
+
+      it('should output the right assets (css)', () => {
+        expect(cssAssets).toEqual([
+            `//unpkg.com/jasmine2@${versions.jasmine}/style1.css`,
+            `//unpkg.com/jasmine2@${versions.jasmine}/style2.css`,
+            `//unpkg.com/archy@${versions.archy}/style1.css`,
+            `//unpkg.com/archy@${versions.archy}/style2.css`,
+        ]);
+      });
+
+      it('should output the right assets (js)', () => {
+        expect(jsAssets).toEqual([
+            `//unpkg.com/jasmine2@${versions.jasmine}/index1.js`,
+            `//unpkg.com/jasmine2@${versions.jasmine}/index2.js`,
+            `//unpkg.com/archy@${versions.archy}/index1.js`,
+            `//unpkg.com/archy@${versions.archy}/index2.js`,
+            'assets/app.js'
+        ]);
+      });
+    });
   });
 
   describe('When `prod` is false', () => {
@@ -234,16 +278,16 @@ describe('Webpack Integration', () => {
       });
 
       it('should output the right assets (css)', () => {
-        expect(cssAssets).toEqual(['/local.css', '/nyc/style.css', '/jasmine/style.css']);
+        expect(cssAssets).toEqual(['local.css', 'nyc/style.css', 'jasmine/style.css']);
       });
 
       it('should output the right assets (js)', () => {
         expect(jsAssets).toEqual([
-          '/local.js',
-          '/jasmine-spec-reporter/index.js',
-          '/nyc/index.js',
-          '/jasmine/lib/jasmine.js',
-          '/app.js',
+          'local.js',
+          'jasmine-spec-reporter/index.js',
+          'nyc/index.js',
+          'jasmine/lib/jasmine.js',
+          'assets/app.js',
         ]);
       });
     });
@@ -304,24 +348,49 @@ describe('Webpack Integration', () => {
         );
       });
       it('should output the right assets (css)', () => {
-        expect(cssAssets).toEqual(['/local.css', '/nyc/style.css', '/jasmine/style.css']);
-        expect(cssAssets2).toEqual(['/local.css', '/nyc/style.css', '/archy/style.css']);
+        expect(cssAssets).toEqual(['local.css', 'nyc/style.css', 'jasmine/style.css']);
+        expect(cssAssets2).toEqual(['local.css', 'nyc/style.css', 'archy/style.css']);
       });
 
       it('should output the right assets (js)', () => {
         expect(jsAssets).toEqual([
-          '/local.js',
-          '/jasmine-spec-reporter/index.js',
-          '/nyc/index.js',
-          '/jasmine/lib/jasmine.js',
-          '/app.js',
+          'local.js',
+          'jasmine-spec-reporter/index.js',
+          'nyc/index.js',
+          'jasmine/lib/jasmine.js',
+          'assets/app.js',
         ]);
         expect(jsAssets2).toEqual([
-          '/local.js',
-          '/jasmine-core/index.js',
-          '/nyc/index.js',
-          '/archy/index.js',
-          '/app.js',
+          'local.js',
+          'jasmine-core/index.js',
+          'nyc/index.js',
+          'archy/index.js',
+          'assets/app.js',
+        ]);
+      });
+    });
+
+    describe('With multiple files', () => {
+      beforeAll((done) => {
+        runWebpack(done, getConfig({ prod: false, publicPath: null, publicPath2: null, multipleFiles: true }));
+      });
+
+      it('should output the right assets (css)', () => {
+        expect(cssAssets).toEqual([
+            'jasmine/style1.css',
+            'jasmine/style2.css',
+            'archy/style1.css',
+            'archy/style2.css',
+        ]);
+      });
+
+      it('should output the right assets (js)', () => {
+        expect(jsAssets).toEqual([
+            'jasmine/index1.js',
+            'jasmine/index2.js',
+            'archy/index1.js',
+            'archy/index2.js',
+            'assets/app.js'
         ]);
       });
     });
