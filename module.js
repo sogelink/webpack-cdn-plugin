@@ -8,14 +8,18 @@ const DEFAULT_MODULE_KEY = 'defaultCdnModuleKey____';
 
 class WebpackCdnPlugin {
   constructor({
-    modules, prod,
+    modules,
+    prod,
     prodUrl = '//unpkg.com/:name@:version/:path',
-    devUrl = ':name/:path', publicPath,
+    devUrl = ':name/:path',
+    publicPath,
+    optimize = false,
   }) {
     this.modules = Array.isArray(modules) ? { [DEFAULT_MODULE_KEY]: modules } : modules;
     this.prod = prod !== false;
     this.prefix = publicPath;
     this.url = this.prod ? prodUrl : devUrl;
+    this.optimize = optimize;
   }
 
   apply(compiler) {
@@ -37,11 +41,24 @@ class WebpackCdnPlugin {
 
     compiler.plugin('compilation', (compilation) => {
       compilation.plugin('html-webpack-plugin-before-html-generation', (data, callback) => {
+        let usedModules = undefined;
+        if (this.optimize) {
+          usedModules = {};
+
+          compilation.getStats().toJson().chunks.forEach(c => { 
+            c.modules.forEach(m => {
+              m.reasons.forEach(r => {
+                usedModules[r.userRequest] = true;
+              });
+            });
+          });
+        }
+
         const moduleId = data.plugin.options.cdnModule;
         if (moduleId !== false) {
-          const modules = this.modules[moduleId || Reflect.ownKeys(this.modules)[0]];
+          let modules = this.modules[moduleId || Reflect.ownKeys(this.modules)[0]];
           if (modules) {
-            WebpackCdnPlugin._cleanModules(modules);
+            modules = WebpackCdnPlugin._cleanModules(modules, usedModules);
             data.assets.js = WebpackCdnPlugin._getJs(modules, ...getArgs).concat(data.assets.js);
             data.assets.css = WebpackCdnPlugin._getCss(modules, ...getArgs).concat(data.assets.css);
           }
@@ -65,27 +82,31 @@ class WebpackCdnPlugin {
     return require(path.join(WebpackCdnPlugin.node_modules, name, packageJson)).version;
   }
 
-  static _cleanModules(modules) {
-    modules.forEach(p => {
-      p.version = WebpackCdnPlugin.getVersion(p.name);
+  static _cleanModules(modules, usedModules) {
+    return modules
+      .filter(p => !usedModules || usedModules[p.name])
+      .map(p => {
+        p.version = WebpackCdnPlugin.getVersion(p.name);
 
-      if (!p.paths) {
-        p.paths = [];
-      }
-      if (p.path) {
-        p.paths.unshift(p.path);
-      }
-      if (p.paths.length === 0) {
-        p.paths.push(require.resolve(p.name).match(/[\\/]node_modules[\\/].+?[\\/](.*)/)[1].replace(/\\/g, '/'));
-      }
+        if (!p.paths) {
+          p.paths = [];
+        }
+        if (p.path) {
+          p.paths.unshift(p.path);
+        }
+        if (p.paths.length === 0) {
+          p.paths.push(require.resolve(p.name).match(/[\\/]node_modules[\\/].+?[\\/](.*)/)[1].replace(/\\/g, '/'));
+        }
 
-      if (!p.styles) {
-        p.styles = [];
-      }
-      if (p.style) {
-        p.styles.unshift(p.style);
-      }
-    });
+        if (!p.styles) {
+          p.styles = [];
+        }
+        if (p.style) {
+          p.styles.unshift(p.style);
+        }
+
+        return p;
+      });
   }
 
   static _getCss(modules, url, prefix, prod, publicPath) {

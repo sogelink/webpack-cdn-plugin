@@ -62,6 +62,7 @@ function getConfig({
   prodUrl,
   multiple,
   multipleFiles,
+  optimize,
 }) {
   const output = {
     path: path.join(__dirname, 'dist/assets'),
@@ -129,6 +130,7 @@ function getConfig({
     modules,
     prod,
     prodUrl,
+    optimize,
   };
 
   if (publicPath) {
@@ -391,6 +393,25 @@ describe('Webpack Integration', () => {
             'archy/index1.js',
             'archy/index2.js',
             'assets/app.js'
+        ]);
+      });
+    });
+
+    describe('With `optimize`', () => {
+      beforeAll((done) => {
+        runWebpack(done, getConfig({ prod: false, publicPath: null, publicPath2: null, optimize: true }));
+      });
+
+      it('should output the right assets (css)', () => {
+        expect(cssAssets).toEqual([
+            'jasmine/style.css',
+        ]);
+      });
+
+      it('should output the right assets (js)', () => {
+        expect(jsAssets).toEqual([
+            'jasmine/lib/jasmine.js',
+            'assets/app.js',
         ]);
       });
     });
