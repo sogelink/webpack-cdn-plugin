@@ -45,7 +45,7 @@ class WebpackCdnPlugin {
         if (this.optimize) {
           usedModules = {};
 
-          compilation.getStats().toJson().chunks.forEach(c => { 
+          compilation.getStats().toJson().chunks.forEach(c => {
             c.modules.forEach(m => {
               m.reasons.forEach(r => {
                 usedModules[r.userRequest] = true;
@@ -93,6 +93,7 @@ class WebpackCdnPlugin {
         }
         if (p.path) {
           p.paths.unshift(p.path);
+          p.path = undefined;
         }
         if (p.paths.length === 0) {
           p.paths.push(require.resolve(p.name).match(/[\\/]node_modules[\\/].+?[\\/](.*)/)[1].replace(/\\/g, '/'));
@@ -103,6 +104,7 @@ class WebpackCdnPlugin {
         }
         if (p.style) {
           p.styles.unshift(p.style);
+          p.style = undefined;
         }
 
         return p;
